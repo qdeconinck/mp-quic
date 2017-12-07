@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	quic "github.com/lucas-clemente/quic-go"
-	"github.com/lucas-clemente/quic-go/protocol"
-	"github.com/lucas-clemente/quic-go/utils"
+	"github.com/lucas-clemente/quic-go/internal/protocol"
+	"github.com/lucas-clemente/quic-go/internal/utils"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 )
@@ -83,8 +83,14 @@ func (w *responseWriter) Write(p []byte) (int, error) {
 
 func (w *responseWriter) Flush() {}
 
+// This is a NOP. Use http.Request.Context
+func (w *responseWriter) CloseNotify() <-chan bool { return make(<-chan bool) }
+
 // test that we implement http.Flusher
 var _ http.Flusher = &responseWriter{}
+
+// test that we implement http.CloseNotifier
+var _ http.CloseNotifier = &responseWriter{}
 
 // copied from http2/http2.go
 // bodyAllowedForStatus reports whether a given response status code

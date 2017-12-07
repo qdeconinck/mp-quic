@@ -14,19 +14,13 @@ quic-go is an implementation of the [QUIC](https://en.wikipedia.org/wiki/QUIC) p
 quic-go is compatible with the current version(s) of Google Chrome and QUIC as deployed on Google's servers. We're actively tracking the development of the Chrome code to ensure compatibility as the protocol evolves. In that process, we're dropping support for old QUIC versions.
 As Google's QUIC versions are expected to converge towards the [IETF QUIC draft](https://github.com/quicwg/base-drafts), quic-go will eventually implement that draft.
 
-
-Major TODOs:
-
-- Better packet loss detection
-- Connection migration
-- Client-side 0-RTT support
-- BBR congestion control
-
 ## Guides
 
-Installing deps:
+We currently support Go 1.9+.
 
-    go get -t
+Installing and updating dependencies:
+
+    go get -t -u ./...
 
 Running tests:
 
@@ -44,9 +38,13 @@ Using Chrome:
 
     /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --user-data-dir=/tmp/chrome --no-proxy-server --enable-quic --origin-to-force-quic-on=quic.clemente.io:443 --host-resolver-rules='MAP quic.clemente.io:443 127.0.0.1:6121' https://quic.clemente.io
 
+### QUIC without HTTP/2
+
+Take a look at [this echo example](example/echo/echo.go).
+
 ### Using the example client
 
-    go run example/client/main.go https://quic.clemente.io
+    go run example/client/main.go https://clemente.io
 
 ## Usage
 
@@ -61,14 +59,14 @@ h2quic.ListenAndServeQUIC("localhost:4242", "/path/to/cert/chain.pem", "/path/to
 
 ### As a client
 
-See the [example client](example/client/main.go). Use a `QuicRoundTripper` as a `Transport` in a `http.Client`.
+See the [example client](example/client/main.go). Use a `h2quic.RoundTripper` as a `Transport` in a `http.Client`.
 
 ```go
 http.Client{
-  Transport: &h2quic.QuicRoundTripper{},
+  Transport: &h2quic.RoundTripper{},
 }
 ```
 
-## Building on Windows
+## Contributing
 
-Due to the low Windows timer resolution (see [StackOverflow question](http://stackoverflow.com/questions/37706834/high-resolution-timers-millisecond-precision-in-go-on-windows)) available with Go 1.6.x, some optimizations might not work when compiled with this version of the compiler. Please use Go 1.7 on Windows.
+We are always happy to welcome new contributors! We have a number of self-contained issues that are suitable for first-time contributors, they are tagged with [want-help](https://github.com/lucas-clemente/quic-go/issues?q=is%3Aopen+is%3Aissue+label%3Awant-help). If you have any questions, please feel free to reach out by opening an issue or leaving a comment.

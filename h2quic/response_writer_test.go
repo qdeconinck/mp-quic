@@ -2,13 +2,16 @@ package h2quic
 
 import (
 	"bytes"
+	"context"
+	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 
-	"github.com/lucas-clemente/quic-go/protocol"
+	"github.com/lucas-clemente/quic-go/internal/protocol"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -20,14 +23,40 @@ type mockStream struct {
 	reset        bool
 	closed       bool
 	remoteClosed bool
+
+	unblockRead chan struct{}
+	ctx         context.Context
+	ctxCancel   context.CancelFunc
 }
 
-func (s *mockStream) Close() error                          { s.closed = true; return nil }
-func (s *mockStream) Reset(error)                           { s.reset = true }
-func (s *mockStream) CloseRemote(offset protocol.ByteCount) { s.remoteClosed = true }
-func (s mockStream) StreamID() protocol.StreamID            { return s.id }
+func newMockStream(id protocol.StreamID) *mockStream {
+	s := &mockStream{
+		id:          id,
+		unblockRead: make(chan struct{}),
+	}
+	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
+	return s
+}
 
-func (s *mockStream) Read(p []byte) (int, error)  { return s.dataToRead.Read(p) }
+func (s *mockStream) Close() error                                 { s.closed = true; s.ctxCancel(); return nil }
+func (s *mockStream) Reset(error)                                  { s.reset = true }
+func (s *mockStream) CloseRemote(offset protocol.ByteCount)        { s.remoteClosed = true; s.ctxCancel() }
+func (s mockStream) StreamID() protocol.StreamID                   { return s.id }
+func (s *mockStream) Context() context.Context                     { return s.ctx }
+func (s *mockStream) SetDeadline(time.Time) error                  { panic("not implemented") }
+func (s *mockStream) SetReadDeadline(time.Time) error              { panic("not implemented") }
+func (s *mockStream) SetWriteDeadline(time.Time) error             { panic("not implemented") }
+func (s *mockStream) GetBytesSent() (protocol.ByteCount, error)    { panic("not implemented") }
+func (s *mockStream) GetBytesRetrans() (protocol.ByteCount, error) { panic("not implemented") }
+
+func (s *mockStream) Read(p []byte) (int, error) {
+	n, _ := s.dataToRead.Read(p)
+	if n == 0 { // block if there's no data
+		<-s.unblockRead
+		return 0, io.EOF
+	}
+	return n, nil // never return an EOF
+}
 func (s *mockStream) Write(p []byte) (int, error) { return s.dataWritten.Write(p) }
 
 var _ = Describe("Response Writer", func() {

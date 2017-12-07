@@ -4,15 +4,21 @@ import (
 	"bytes"
 	"flag"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"sync"
 
+	quic "github.com/lucas-clemente/quic-go"
+
 	"github.com/lucas-clemente/quic-go/h2quic"
-	"github.com/lucas-clemente/quic-go/utils"
+	"github.com/lucas-clemente/quic-go/internal/utils"
 )
 
 func main() {
 	verbose := flag.Bool("v", false, "verbose")
+	multipath := flag.Bool("m", false, "multipath")
+	output := flag.String("o", "", "logging output")
 	flag.Parse()
 	urls := flag.Args()
 
@@ -21,9 +27,23 @@ func main() {
 	} else {
 		utils.SetLogLevel(utils.LogLevelInfo)
 	}
+	utils.SetLogTimeFormat("")
+
+	if *output != "" {
+		logfile, err := os.Create(*output)
+		if err != nil {
+			panic(err)
+		}
+		defer logfile.Close()
+		log.SetOutput(logfile)
+	}
+
+	quicConfig := &quic.Config{
+		CreatePaths: *multipath,
+	}
 
 	hclient := &http.Client{
-		Transport: &h2quic.QuicRoundTripper{},
+		Transport: &h2quic.RoundTripper{QuicConfig: quicConfig},
 	}
 
 	var wg sync.WaitGroup

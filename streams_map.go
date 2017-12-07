@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/lucas-clemente/quic-go/handshake"
-	"github.com/lucas-clemente/quic-go/protocol"
+	"github.com/lucas-clemente/quic-go/internal/handshake"
+	"github.com/lucas-clemente/quic-go/internal/protocol"
 	"github.com/lucas-clemente/quic-go/qerr"
 )
 
@@ -31,14 +31,12 @@ type streamsMap struct {
 
 	newStream newStreamLambda
 
-	maxOutgoingStreams uint32
 	numOutgoingStreams uint32
-	maxIncomingStreams uint32
 	numIncomingStreams uint32
 }
 
 type streamLambda func(*stream) (bool, error)
-type newStreamLambda func(protocol.StreamID) (*stream, error)
+type newStreamLambda func(protocol.StreamID) *stream
 
 var (
 	errMapAccess = errors.New("streamsMap: Error accessing the streams map")
@@ -85,15 +83,27 @@ func (m *streamsMap) GetOrOpenStream(id protocol.StreamID) (*stream, error) {
 		return s, nil
 	}
 
-	if id <= m.highestStreamOpenedByPeer {
-		return nil, nil
+	if m.perspective == protocol.PerspectiveServer {
+		if id%2 == 0 {
+			if id <= m.nextStream { // this is a server-side stream that we already opened. Must have been closed already
+				return nil, nil
+			}
+			return nil, qerr.Error(qerr.InvalidStreamID, fmt.Sprintf("attempted to open stream %d from client-side", id))
+		}
+		if id <= m.highestStreamOpenedByPeer { // this is a client-side stream that doesn't exist anymore. Must have been closed already
+			return nil, nil
+		}
 	}
-
-	if m.perspective == protocol.PerspectiveServer && id%2 == 0 {
-		return nil, qerr.Error(qerr.InvalidStreamID, fmt.Sprintf("attempted to open stream %d from client-side", id))
-	}
-	if m.perspective == protocol.PerspectiveClient && id%2 == 1 {
-		return nil, qerr.Error(qerr.InvalidStreamID, fmt.Sprintf("attempted to open stream %d from server-side", id))
+	if m.perspective == protocol.PerspectiveClient {
+		if id%2 == 1 {
+			if id <= m.nextStream { // this is a client-side stream that we already opened.
+				return nil, nil
+			}
+			return nil, qerr.Error(qerr.InvalidStreamID, fmt.Sprintf("attempted to open stream %d from server-side", id))
+		}
+		if id <= m.highestStreamOpenedByPeer { // this is a server-side stream that doesn't exist anymore. Must have been closed already
+			return nil, nil
+		}
 	}
 
 	// sid is the next stream that will be opened
@@ -122,11 +132,6 @@ func (m *streamsMap) openRemoteStream(id protocol.StreamID) (*stream, error) {
 		return nil, qerr.Error(qerr.InvalidStreamID, fmt.Sprintf("attempted to open stream %d, which is a lot smaller than the highest opened stream, %d", id, m.highestStreamOpenedByPeer))
 	}
 
-	s, err := m.newStream(id)
-	if err != nil {
-		return nil, err
-	}
-
 	if m.perspective == protocol.PerspectiveServer {
 		m.numIncomingStreams++
 	} else {
@@ -137,6 +142,7 @@ func (m *streamsMap) openRemoteStream(id protocol.StreamID) (*stream, error) {
 		m.highestStreamOpenedByPeer = id
 	}
 
+	s := m.newStream(id)
 	m.putStream(s)
 	return s, nil
 }
@@ -147,11 +153,6 @@ func (m *streamsMap) openStreamImpl() (*stream, error) {
 		return nil, qerr.TooManyOpenStreams
 	}
 
-	s, err := m.newStream(id)
-	if err != nil {
-		return nil, err
-	}
-
 	if m.perspective == protocol.PerspectiveServer {
 		m.numOutgoingStreams++
 	} else {
@@ -159,6 +160,7 @@ func (m *streamsMap) openStreamImpl() (*stream, error) {
 	}
 
 	m.nextStream += 2
+	s := m.newStream(id)
 	m.putStream(s)
 	return s, nil
 }
@@ -168,6 +170,9 @@ func (m *streamsMap) OpenStream() (*stream, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	if m.closeErr != nil {
+		return nil, m.closeErr
+	}
 	return m.openStreamImpl()
 }
 
@@ -215,10 +220,7 @@ func (m *streamsMap) Iterate(fn streamLambda) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	openStreams := make([]protocol.StreamID, len(m.openStreams), len(m.openStreams))
-	for i, streamID := range m.openStreams { // copy openStreams
-		openStreams[i] = streamID
-	}
+	openStreams := append([]protocol.StreamID{}, m.openStreams...)
 
 	for _, streamID := range openStreams {
 		cont, err := m.iterateFunc(streamID, fn)
@@ -321,8 +323,11 @@ func (m *streamsMap) RemoveStream(id protocol.StreamID) error {
 
 func (m *streamsMap) CloseWithError(err error) {
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	m.closeErr = err
 	m.nextStreamOrErrCond.Broadcast()
 	m.openStreamOrErrCond.Broadcast()
-	m.mutex.Unlock()
+	for _, s := range m.openStreams {
+		m.streams[s].Cancel(err)
+	}
 }

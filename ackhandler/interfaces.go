@@ -3,33 +3,43 @@ package ackhandler
 import (
 	"time"
 
-	"github.com/lucas-clemente/quic-go/frames"
-	"github.com/lucas-clemente/quic-go/protocol"
+	"github.com/lucas-clemente/quic-go/internal/protocol"
+	"github.com/lucas-clemente/quic-go/internal/wire"
 )
 
 // SentPacketHandler handles ACKs received for outgoing packets
 type SentPacketHandler interface {
+	// SentPacket may modify the packet
 	SentPacket(packet *Packet) error
-	ReceivedAck(ackFrame *frames.AckFrame, withPacketNumber protocol.PacketNumber, recvTime time.Time) error
+	ReceivedAck(ackFrame *wire.AckFrame, withPacketNumber protocol.PacketNumber, recvTime time.Time) error
 
-	GetStopWaitingFrame(force bool) *frames.StopWaitingFrame
-
-	MaybeQueueRTOs()
-	DequeuePacketForRetransmission() (packet *Packet)
-
-	BytesInFlight() protocol.ByteCount
-	GetLeastUnacked() protocol.PacketNumber
+	// Specific to multipath operation
+	ReceivedClosePath(f *wire.ClosePathFrame, withPacketNumber protocol.PacketNumber, recvTime time.Time) error
+	SetInflightAsLost()
 
 	SendingAllowed() bool
-	CheckForError() error
+	GetStopWaitingFrame(force bool) *wire.StopWaitingFrame
+	ShouldSendRetransmittablePacket() bool
+	DequeuePacketForRetransmission() (packet *Packet)
+	GetLeastUnacked() protocol.PacketNumber
 
-	TimeOfFirstRTO() time.Time
+	GetAlarmTimeout() time.Time
+	OnAlarm()
+
+	DuplicatePacket(packet *Packet)
+
+	GetStatistics() (uint64, uint64, uint64)
 }
 
 // ReceivedPacketHandler handles ACKs needed to send for incoming packets
 type ReceivedPacketHandler interface {
 	ReceivedPacket(packetNumber protocol.PacketNumber, shouldInstigateAck bool) error
-	ReceivedStopWaiting(*frames.StopWaitingFrame) error
+	SetLowerLimit(protocol.PacketNumber)
 
-	GetAckFrame() *frames.AckFrame
+	GetAlarmTimeout() time.Time
+	GetAckFrame() *wire.AckFrame
+
+	GetClosePathFrame() *wire.ClosePathFrame
+
+	GetStatistics() uint64
 }
