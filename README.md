@@ -1,5 +1,7 @@
 # A QUIC implementation in pure Go
 
+**Please read https://multipath-quic.org/2017/12/09/artifacts-available.html to figure out how to setup the code.**
+
 <img src="docs/quic.png" width=303 height=124>
 
 [![Godoc Reference](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/lucas-clemente/quic-go)
