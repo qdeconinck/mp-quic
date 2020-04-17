@@ -333,7 +333,7 @@ func (h *cryptoSetupClient) handleREJMessage(cryptoData map[Tag][]byte) error {
 		}
 		h.certData = crt
 
-		err = h.certManager.Verify("quic.clemente.io") // h.hostname)
+		err = h.certManager.Verify(h.hostname)
 		if err != nil {
 			utils.Infof("Certificate validation failed: %s", err.Error())
 			return qerr.ProofInvalid
