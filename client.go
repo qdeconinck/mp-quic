@@ -196,9 +196,9 @@ func populateClientConfig(config *Config) *Config {
 		RequestConnectionIDTruncation:         config.RequestConnectionIDTruncation,
 		MaxReceiveStreamFlowControlWindow:     maxReceiveStreamFlowControlWindow,
 		MaxReceiveConnectionFlowControlWindow: maxReceiveConnectionFlowControlWindow,
-		KeepAlive:      config.KeepAlive,
-		CacheHandshake: config.CacheHandshake,
-		CreatePaths:    config.CreatePaths,
+		KeepAlive:                             config.KeepAlive,
+		CacheHandshake:                        config.CacheHandshake,
+		CreatePaths:                           config.CreatePaths,
 	}
 }
 
@@ -317,7 +317,7 @@ func (c *client) handlePacket(rcvRawPacket *receivedRawPacket) {
 		}
 		pr, err := wire.ParsePublicReset(r)
 		if err != nil {
-			utils.Infof("Received a Public Reset for connection %x. An error occurred parsing the packet.")
+			utils.Infof("Received a Public Reset for connection %x. An error occurred parsing the packet.", hdr.ConnectionID)
 			return
 		}
 		utils.Infof("Received Public Reset, rejected packet number: %#x.", pr.RejectedPacketNumber)

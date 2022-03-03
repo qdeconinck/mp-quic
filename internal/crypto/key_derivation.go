@@ -44,7 +44,7 @@ func computeKeyAndIV(mc MintController, label string) (key, iv []byte, err error
 	if err != nil {
 		return nil, nil, err
 	}
-	key = mint.HkdfExpandLabel(cs.Hash, secret, "key", nil, cs.KeyLen)
-	iv = mint.HkdfExpandLabel(cs.Hash, secret, "iv", nil, cs.IvLen)
+	key = mint.HkdfExpandLabel(cs.Hash, secret, "key", nil, cs.KeyLengths["key"])
+	iv = mint.HkdfExpandLabel(cs.Hash, secret, "iv", nil, cs.KeyLengths["iv"])
 	return key, iv, nil
 }
