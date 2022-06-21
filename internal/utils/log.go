@@ -79,17 +79,26 @@ func init() {
 	readLoggingEnv()
 }
 
-func readLoggingEnv() {
-	switch strings.ToLower(os.Getenv(logEnv)) {
+func ParseLogLevel(ll string) (LogLevel, error) {
+
+	switch ll {
 	case "":
-		return
+		return LogLevelNothing, nil
 	case "debug":
-		logLevel = LogLevelDebug
+		return LogLevelDebug, nil
 	case "info":
-		logLevel = LogLevelInfo
+		return LogLevelInfo, nil
 	case "error":
-		logLevel = LogLevelError
+		return LogLevelError, nil
 	default:
-		fmt.Fprintln(os.Stderr, "invalid quic-go log level, see https://github.com/lucas-clemente/quic-go/wiki/Logging")
+		return 0, fmt.Errorf("invalid quic-go log level, see https://github.com/lucas-clemente/quic-go/wiki/Logging")
 	}
+}
+
+func readLoggingEnv() {
+	ll, err  := ParseLogLevel(strings.ToLower(os.Getenv(logEnv)))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	logLevel = ll
 }

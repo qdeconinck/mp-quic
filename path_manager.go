@@ -118,6 +118,9 @@ func getIPVersion(ip net.IP) int {
 
 func (pm *pathManager) advertiseAddresses() {
 	pm.pconnMgr.mutex.Lock()
+	if utils.Debug() {
+		utils.Debugf("advertising addresses to remote")
+	}
 	defer pm.pconnMgr.mutex.Unlock()
 	for _, locAddr := range pm.pconnMgr.localAddrs {
 		_, sent := pm.advertisedLocAddrs[locAddr.String()]
