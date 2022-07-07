@@ -21,9 +21,10 @@ func (c *mockMintController) Handshake() mint.Alert { panic("not implemented") }
 
 func (c *mockMintController) GetCipherSuite() mint.CipherSuiteParams {
 	return mint.CipherSuiteParams{
-		Hash:   c.hash,
-		KeyLen: 32,
-		IvLen:  12,
+		Hash:       c.hash,
+		KeyLengths: map[string]int{"key": 32, "iv": 12},
+		// KeyLen: 32,
+		// IvLen:  12,
 	}
 }
 
